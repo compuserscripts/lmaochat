@@ -17,6 +17,7 @@ local NICKNAME_MAX_LENGTH = 16
 local MESSAGE_MAX_LENGTH = 127
 local firstTimeUser = true
 local timestamps = false -- Set to false to disable timestamps
+local showClassChanges = false -- Toggle for class change notifications
 
 -- Key constants
 local DEFAULT_CHAT_KEY = KEY_Y
@@ -2576,7 +2577,7 @@ end)
 
 -- Class change event handler
 callbacks.Register("FireGameEvent", "class_change_handler", function(event)
-    if event:GetName() ~= "player_changeclass" then return end
+    if event:GetName() ~= "player_changeclass" or not showClassChanges then return end
     
     local player = entities.GetByUserID(event:GetInt("userid"))
     if not player or not player:IsValid() then return end
@@ -2593,7 +2594,6 @@ callbacks.Register("FireGameEvent", "class_change_handler", function(event)
     if not classNames[classID] then return end
     
     local dims = ChatVGUI.getCurrentDimensions()
-    --local teamColor = team == 2 and "\\x02" or (team == 3 and "\\x0A" or "\\x16")
     local teamColor = team == 2 and "\\x16" or (team == 3 and "\\x16" or "\\x16")
     
     -- Sanitize player name to handle UTF-8/Cyrillic characters
