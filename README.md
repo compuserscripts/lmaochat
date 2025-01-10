@@ -1,6 +1,8 @@
 # lmaochat
 Custom chat system for LMAOBOX (Lua 5.1)
 
+Requires vgui.lua https://github.com/compuserscripts/Lua-VGUI-Parser/
+
 ### Online Chat System
 Chat with other lmaobox users regardless of which tf2 server they're on:
 - Anonymous simple registration with just a password (no email needed)
