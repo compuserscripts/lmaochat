@@ -34,3 +34,15 @@ The client features a completely redesigned chat window
 Online chat system also supports regular ingame chat
 - Class change notifications
 - Color code support for online chat and nicknames
+
+Config is stored in chat.cfg file inside your game folder
+
+To disable the custom chatbox and use normal chat
+
+```-- Custom Chat Configuration
+local ChatConfig = {
+    enabled = true, <--- change this to false
+    config = nil,
+    inputActive = false,
+    ...
+```
