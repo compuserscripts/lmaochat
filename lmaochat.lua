@@ -66,6 +66,15 @@ local ChatUI = {
     CTRL_ARROW_DELAY = 0.1,
 }
 
+-- Add initialization state tracking
+local InitState = {
+    initialized = false,
+    initAttempts = 0,
+    maxAttempts = 10,
+    checkInterval = 1, -- seconds between init attempts
+    lastCheckTime = 0
+}
+
 -- VGUI Integration
 local ChatVGUI = {
     config = nil,
@@ -3721,80 +3730,123 @@ local function fetchAndDisplayMOTD(username, password)
     end
 end
 
--- Initialize VGUI on script load
-ChatVGUI.parseConfig()
-
--- Main Draw callback for chat rendering and message fetching
-callbacks.Register("Draw", function()
-    -- Update word completion check
-    checkWordCompletion()
-    -- Update message fetch
-    local now = globals.RealTime()
-    if now - lastFetch >= 2 then  -- Fetch every 2 seconds
-        lastFetch = now
-        fetchMessages()
-    end
-
-    -- Don't draw chat if console or game UI is visible
-    if not ChatConfig.enabled or engine.Con_IsVisible() or engine.IsGameUIVisible() then 
-        return 
+-- Move all initialization code here
+local function initializeChat()
+    -- Check if we can access required game functions
+    if not entities or not entities.GetLocalPlayer then
+        return false
     end
     
-    -- Draw chat using VGUI configuration
-    ChatVGUI.drawChat(ChatConfig, ChatUI)
-end)
-
--- Initialize
---draw.AddFontResource("tf/custom/m0rehud/resource/scheme/fonts/TwitterColorEmoji-SVGinOT.ttf") -- In Team Fortress 2 folder
---ChatUI.font = draw.CreateFont("TwitterColorEmoji-SVGinOT", 14, 400, FONTFLAG_CUSTOM | FONTFLAG_ANTIALIAS)
-ChatUI.font = draw.CreateFont("Verdana", 18, 400, FONTFLAG_ANTIALIAS)
-
-checkVersion()
-chatMessage(versionStatus)
-
-loadConfig()
-if firstTimeUser then
-    chatMessage("\\x0AWelcome to chat!")
-    chatMessage("Use \\x02/register\\x01 or \\x02/r\\x01 <password> to create an account")
-elseif username and password then
-    -- Attempt auto-login
-    local response = makeRequest("get", {
-        u = username,
-        p = password
-    })
+    -- Only initialize if we're in a game
+    if not entities.GetLocalPlayer() then
+        return false
+    end
     
-    if response and response ~= "AUTH_ERROR" then
-        authenticated = true
-        
-        local listResponse = makeRequest("list", {
+    -- Initialize VGUI
+    ChatVGUI.parseConfig()
+    
+    -- Initialize font
+    ChatUI.font = draw.CreateFont("Verdana", 18, 400, FONTFLAG_ANTIALIAS)
+    
+    -- Initialize emoji system
+    initializeEmojis()
+    validateEmojiSystem()
+    
+    -- Check version
+    checkVersion()
+    chatMessage(versionStatus)
+    
+    -- Load config and handle login
+    loadConfig()
+    if firstTimeUser then
+        chatMessage("\\x0AWelcome to chat!")
+        chatMessage("Use \\x02/register\\x01 or \\x02/r\\x01 <password> to create an account")
+    elseif username and password then
+        -- Attempt auto-login
+        local response = makeRequest("get", {
             u = username,
             p = password
         })
         
-        local userCount = "0"
-        if listResponse and listResponse ~= "NO_USERS" then
-            userCount = listResponse:match("^(%d+)")
-        end
-        chatMessage("\\x01Welcome back " .. username .. "! (" .. "\\x03" .. userCount .. "\\x01 users online)")
-        
-        -- Fetch and display MOTD if available
-        fetchAndDisplayMOTD(username, password)
-        
-        if not nickname then
-            chatMessage("Use \\x02/nick\\x01 or \\x02/n\\x01 <nickname> to set your nickname")
+        if response and response ~= "AUTH_ERROR" then
+            authenticated = true
+            
+            local listResponse = makeRequest("list", {
+                u = username,
+                p = password
+            })
+            
+            local userCount = "0"
+            if listResponse and listResponse ~= "NO_USERS" then
+                userCount = listResponse:match("^(%d+)")
+            end
+            chatMessage("\\x01Welcome back " .. username .. "! (" .. "\\x03" .. userCount .. "\\x01 users online)")
+            
+            -- Fetch and display MOTD if available
+            fetchAndDisplayMOTD(username, password)
+            
+            if not nickname then
+                chatMessage("Use \\x02/nick\\x01 or \\x02/n\\x01 <nickname> to set your nickname")
+            else
+                chatMessage("You're all set! Start chatting with /<message>")
+                chatMessage("Use /users or /u to see who's online")
+            end
         else
-            chatMessage("You're all set! Start chatting with /<message>")
-            chatMessage("Use /users or /u to see who's online")
+            chatMessage("Previous login expired. Please login again with /login <password>")
         end
     else
-        chatMessage("Previous login expired. Please login again with /login <password>")
+        chatMessage("Please login with /login <password>")
     end
-else
-    chatMessage("Please login with /login <password>")
+    
+    -- Update chat visibility
+    updateChatVisibility()
+    
+    InitState.initialized = true
+    return true
 end
 
--- Call updateChatVisibility when the script loads
-updateChatVisibility()
+-- Add initialization check to Draw callback
+local function checkInitialization()
+    if InitState.initialized then return true end
+    
+    local currentTime = globals.RealTime()
+    if currentTime - InitState.lastCheckTime < InitState.checkInterval then
+        return false
+    end
+    
+    InitState.lastCheckTime = currentTime
+    InitState.initAttempts = InitState.initAttempts + 1
+    
+    if InitState.initAttempts > InitState.maxAttempts then
+        print("[Chat] Failed to initialize after " .. InitState.maxAttempts .. " attempts")
+        return false
+    end
+    
+    return initializeChat()
+end
+
+-- Modify the Draw callback to use safe initialization
+callbacks.Register("Draw", function()
+    -- Check initialization first
+    if not checkInitialization() then
+        return
+    end
+    
+    -- Rest of the draw code...
+    checkWordCompletion()
+    
+    local now = globals.RealTime()
+    if now - lastFetch >= 2 then
+        lastFetch = now
+        fetchMessages()
+    end
+    
+    if not ChatConfig.enabled or engine.Con_IsVisible() or engine.IsGameUIVisible() then 
+        return 
+    end
+    
+    ChatVGUI.drawChat(ChatConfig, ChatUI)
+end)
 
 -- Main unload callback
 callbacks.Register("Unload", function()
@@ -3887,7 +3939,3 @@ callbacks.Register("Unload", function()
 
     print("Chat client successfully unloaded and cleaned up")
 end)
-
--- Call this after initialization
-initializeEmojis()
-validateEmojiSystem()
