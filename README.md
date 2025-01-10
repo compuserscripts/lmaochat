@@ -1,5 +1,6 @@
 # lmaochat
 Custom chat system for LMAOBOX (Lua 5.1)
+https://lmaobox.net/forum/v/discussion/25093/lmaochat-chat-with-other-lmaobox-users-with-discord-support#latest
 
 Requires vgui.lua https://github.com/compuserscripts/Lua-VGUI-Parser/
 
