@@ -70,7 +70,7 @@ local ChatUI = {
 local InitState = {
     initialized = false,
     initAttempts = 0,
-    maxAttempts = 10,
+    maxAttempts = 999,
     checkInterval = 1, -- seconds between init attempts
     lastCheckTime = 0
 }
